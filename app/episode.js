@@ -21,6 +21,11 @@
       // timeline — managed by app/moments.js, kept here so they belong to the
       // episode and survive preset/template switches.
       moments: [],
+      // Imported transcript captions ({ fileName, cues:[{start,end,text}] }) or
+      // null — managed by app/captions.js, kept here so the caption track belongs
+      // to the episode and survives preset/template switches (and is cleared by
+      // resetEpisode when starting a fresh episode).
+      captions: null,
       audioQuality: {
         leveling: "balanced",
         clarity: "balanced",

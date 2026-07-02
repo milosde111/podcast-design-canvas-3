@@ -16,6 +16,7 @@ const required = [
   "app/episode.js",
   "app/moments.js",
   "app/moment-images.js",
+  "app/captions.js",
   "app/preview.js",
   "app/ui.js",
   "app/styles.css",
@@ -29,7 +30,7 @@ if (missing.length) {
 // 2. index.html must load the classic scripts in dependency order (not ES
 //    modules — they break over file://) and reference the stylesheet.
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
-const mustReference = ["app/presets.js", "app/episode.js", "app/moments.js", "app/moment-images.js", "app/preview.js", "app/ui.js", "app/styles.css"];
+const mustReference = ["app/presets.js", "app/episode.js", "app/moments.js", "app/moment-images.js", "app/captions.js", "app/preview.js", "app/ui.js", "app/styles.css"];
 const notReferenced = mustReference.filter((r) => !html.includes(r));
 if (notReferenced.length) {
   console.error("preview-build: index.html does not reference:\n  " + notReferenced.join("\n  "));
@@ -45,6 +46,10 @@ if (!html.includes('data-file-bucket="host"')) {
 }
 if (!html.includes('id="moment-image"')) {
   console.error("preview-build: index.html must declare the b-roll PNG upload input");
+  process.exit(1);
+}
+if (!html.includes('id="caption-file"')) {
+  console.error("preview-build: index.html must declare the WebVTT caption upload input");
   process.exit(1);
 }
 if (/type=["']module["']/.test(html)) {
@@ -63,6 +68,21 @@ if (PDC.episode.canCompose(ep)) {
 PDC.episode.assignMedia(ep, "guest1", { name: "b.webm", size: 1, type: "video/webm" });
 if (!PDC.episode.canCompose(ep)) {
   console.error("preview-build: canCompose() false with two speakers + default preset — readiness gate is broken");
+  process.exit(1);
+}
+
+// Caption model invariant: a WebVTT file parses into timed cues that live on the
+// episode, activate on a [start, end) window, and survive a preset switch.
+const vtt = "WEBVTT\n\n1\n00:00:00.000 --> 00:00:03.000\nWelcome to the show.\n\n2\n00:00:04.000 --> 00:00:07.000\nCaptions are working.\n";
+const parsed = PDC.captions.parseVtt(vtt);
+if (!parsed.ok || parsed.cues.length !== 2) {
+  console.error("preview-build: WebVTT parse did not yield two cues — caption import is broken");
+  process.exit(1);
+}
+PDC.captions.setCaptions(ep, "sample.vtt", parsed.cues);
+PDC.episode.setPreset(ep, "spotlight");
+if (!PDC.captions.hasCaptions(ep) || PDC.captions.activeCaptions(ep, 1.5).length !== 1 || PDC.captions.activeCaptions(ep, 3.5).length !== 0) {
+  console.error("preview-build: captions did not survive a preset switch or activate on their window — caption model is broken");
   process.exit(1);
 }
 

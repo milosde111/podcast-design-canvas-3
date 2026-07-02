@@ -199,6 +199,69 @@
     }
   });
 
+  // Imported transcript captions: upload a WebVTT file, parse it into timed
+  // cues on the episode, and let the preview draw whichever cue is active each
+  // frame. Captions live on the episode model, so they survive preset and
+  // template switches, and export burns them in because it records the canvas.
+  const C = PDC.captions;
+  function showCaptionError(message) {
+    const el = $("caption-error");
+    el.textContent = message || "";
+    el.hidden = !message;
+  }
+  function renderCaptionList() {
+    const list = $("caption-list");
+    list.innerHTML = "";
+    C.listCues(episode).forEach(function (cue) {
+      const li = document.createElement("li");
+      const range = document.createElement("span");
+      range.className = "caption-range";
+      range.textContent = C.formatTime(cue.start) + "–" + C.formatTime(cue.end);
+      const text = document.createElement("span");
+      text.className = "caption-text";
+      text.textContent = cue.text.replace(/\n+/g, " ");
+      li.append(range, text);
+      list.appendChild(li);
+    });
+  }
+  function syncCaptionUi() {
+    const captions = C.getCaptions(episode);
+    const has = C.hasCaptions(episode);
+    $("caption-clear").hidden = !has;
+    $("caption-status").textContent = has
+      ? "Loaded " + captions.cues.length + " caption cue" + (captions.cues.length === 1 ? "" : "s") + " from " + captions.fileName + "."
+      : "";
+    renderCaptionList();
+  }
+  $("caption-file").addEventListener("change", async function () {
+    const file = $("caption-file").files && $("caption-file").files[0];
+    if (!file) return;
+    let text = "";
+    try {
+      text = await file.text();
+    } catch (error) {
+      showCaptionError("That caption file could not be read.");
+      return;
+    }
+    const parsed = C.parseVtt(text);
+    if (!parsed.ok) {
+      showCaptionError(parsed.error);
+      return;
+    }
+    C.setCaptions(episode, file.name, parsed.cues);
+    showCaptionError("");
+    $("caption-file").value = "";
+    syncCaptionUi();
+    preview.drawFrame();
+  });
+  $("caption-clear").addEventListener("click", function () {
+    C.clearCaptions(episode);
+    $("caption-file").value = "";
+    showCaptionError("");
+    syncCaptionUi();
+    preview.drawFrame();
+  });
+
   // Scrub bar: jump the shared preview timeline to any time — scheduled
   // moments show or hide immediately to match the scrubbed position.
   const scrubEl = $("scrub");
@@ -381,6 +444,11 @@
     showMomentError("");
     renderMomentList();
 
+    // resetEpisode already dropped episode.captions; clear the input + UI too.
+    $("caption-file").value = "";
+    showCaptionError("");
+    syncCaptionUi();
+
     $("export-progress").hidden = true;
     $("export-bar").style.width = "0%";
     $("export-result").hidden = true;
@@ -473,6 +541,7 @@
   SPEAKER_BUCKETS.forEach(updateBucketRow);
   syncAudioUi();
   renderMomentList();
+  syncCaptionUi();
   renderTemplates();
   refresh();
 })();

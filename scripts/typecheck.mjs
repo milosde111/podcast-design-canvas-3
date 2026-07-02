@@ -26,6 +26,18 @@ const required = {
     "readinessReason",
     "MIN_SPEAKERS",
   ],
+  captions: [
+    "parseVtt",
+    "parseTimestamp",
+    "formatTime",
+    "stripTags",
+    "setCaptions",
+    "clearCaptions",
+    "getCaptions",
+    "hasCaptions",
+    "listCues",
+    "activeCaptions",
+  ],
 };
 
 const missing = [];

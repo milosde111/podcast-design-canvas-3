@@ -197,6 +197,7 @@
       });
 
       drawActiveMoments(w, h);
+      drawActiveCaptions(w, h);
 
       canvasEl.dataset.preset = episodeRef.presetId;
       canvasEl.dataset.speakers = String(buckets.length);
@@ -282,6 +283,78 @@
       ctx.strokeStyle = "rgba(255,255,255,0.92)";
       ctx.lineWidth = Math.max(3, Math.round(w * 0.003));
       ctx.strokeRect(x - 1, y - 1, dw + 2, dh + 2);
+    }
+
+    // Wrap a caption line to fit maxW at the currently-set ctx.font. Returns one
+    // or more display lines (empty array for blank input).
+    function wrapCaptionLine(text, maxW) {
+      const words = String(text).split(/\s+/).filter(Boolean);
+      if (!words.length) return [];
+      const out = [];
+      let line = words[0];
+      for (let i = 1; i < words.length; i++) {
+        const test = line + " " + words[i];
+        if (ctx.measureText(test).width > maxW) {
+          out.push(line);
+          line = words[i];
+        } else {
+          line = test;
+        }
+      }
+      out.push(line);
+      return out;
+    }
+
+    // Imported transcript captions: the cue(s) active at the current reference
+    // time, drawn as a centered lower caption band with a dark backing and an
+    // accent top edge — anchored at the very bottom of the stage, below the
+    // callout lower-third and distinct from the title bar. Captions live on the
+    // episode, so this renders identically over any preset or custom template;
+    // and because export records this same canvas, the caption text is burned
+    // into the exported video at each cue's scheduled time.
+    function drawActiveCaptions(w, h) {
+      if (!PDC.captions || !episodeRef) return;
+      const cues = PDC.captions.activeCaptions(episodeRef, referenceTime);
+      if (!cues.length) return;
+      const fs = Math.max(15, Math.round(h * 0.05));
+      const lineH = Math.round(fs * 1.3);
+      const padX = Math.round(w * 0.022);
+      const padY = Math.round(h * 0.02);
+      const maxTextW = Math.round(w * 0.76);
+
+      ctx.save();
+      ctx.font = "600 " + fs + "px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      const lines = [];
+      cues.forEach(function (cue) {
+        String(cue.text).split("\n").forEach(function (para) {
+          wrapCaptionLine(para, maxTextW).forEach(function (l) { lines.push(l); });
+        });
+      });
+      if (!lines.length) { ctx.restore(); return; }
+
+      let textW = 0;
+      lines.forEach(function (l) { textW = Math.max(textW, ctx.measureText(l).width); });
+      const minBarW = Math.round(w * 0.5);
+      const maxBarW = Math.round(w * 0.86);
+      const barW = Math.min(maxBarW, Math.max(minBarW, Math.round(textW) + padX * 2));
+      const barH = lines.length * lineH + padY * 2;
+      const barX = Math.round((w - barW) / 2);
+      const barY = Math.round(h * 0.955) - barH;
+      const edge = Math.max(3, Math.round(h * 0.006));
+
+      ctx.fillStyle = "rgba(5, 7, 12, 0.82)";
+      ctx.fillRect(barX, barY, barW, barH);
+      ctx.fillStyle = "#43d6a0";
+      ctx.fillRect(barX, barY, barW, edge);
+      ctx.fillStyle = "#ffffff";
+      lines.forEach(function (l, i) {
+        const cy = barY + padY + lineH * i + lineH / 2;
+        ctx.fillText(l, w / 2, cy, maxTextW);
+      });
+      ctx.restore();
     }
 
     function loop() {
