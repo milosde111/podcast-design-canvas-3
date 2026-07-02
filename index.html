@@ -111,6 +111,39 @@
           <button id="mute" type="button" aria-pressed="false" disabled>🔇 Muted</button>
           <button id="export" type="button" disabled>⬇ Export video</button>
         </div>
+        <div class="timeline" id="timeline-wrap">
+          <input id="timeline" type="range" min="0" max="10" step="0.05" value="0" disabled aria-label="Preview timeline" />
+          <span class="timeline-readout" id="timeline-readout">0:00</span>
+        </div>
+
+        <div class="moments" id="moments">
+          <h3 class="substep-title">Timed visual moments</h3>
+          <p class="hint">Add simple title/callout overlays that appear only during their scheduled ranges in preview and export.</p>
+          <div class="moment-form" aria-label="Add timed visual moment">
+            <label>
+              <span>Type</span>
+              <select id="moment-kind" aria-label="Moment type">
+                <option value="title">Title</option>
+                <option value="callout">Callout</option>
+              </select>
+            </label>
+            <label class="moment-text">
+              <span>Text</span>
+              <input id="moment-text" type="text" placeholder="Episode title / reference" autocomplete="off" aria-label="Moment text" />
+            </label>
+            <label>
+              <span>Start</span>
+              <input id="moment-start" type="number" min="0" step="0.1" value="0" aria-label="Moment start time seconds" />
+            </label>
+            <label>
+              <span>End</span>
+              <input id="moment-end" type="number" min="0" step="0.1" value="3" aria-label="Moment end time seconds" />
+            </label>
+            <button id="moment-save" type="button" disabled>Add moment</button>
+            <button id="moment-cancel" type="button" hidden>Cancel</button>
+          </div>
+          <div class="moment-list" id="moment-list" aria-label="Timed moments list"></div>
+        </div>
         <div class="customize" id="customize-bar">
           <button id="customize" type="button" disabled>✎ Customize layout</button>
           <span class="customize-edit" id="customize-edit" hidden>

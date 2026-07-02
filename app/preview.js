@@ -18,6 +18,7 @@
     let rafId = 0;
     let episodeRef = null;
     let referenceTime = 0;
+    let explicitTime = null;
 
     function syncReferenceTime() {
       const times = Object.values(videos)
@@ -28,6 +29,24 @@
       const next = Math.min(...times);
       referenceTime = next;
       return next;
+    }
+
+    function readDuration(video) {
+      if (!video) return 0;
+      if (Number.isFinite(video.duration) && video.duration > 0) return video.duration;
+      try {
+        if (video.seekable && video.seekable.length) {
+          const end = video.seekable.end(video.seekable.length - 1);
+          if (Number.isFinite(end) && end > 0) return end;
+        }
+      } catch (e) {}
+      return 0;
+    }
+
+    function previewDurationSeconds() {
+      const ds = Object.values(videos).map(readDuration).filter((d) => d > 0);
+      if (!ds.length) return 0;
+      return Math.max.apply(null, ds);
     }
 
     function seekAll(time) {
@@ -105,6 +124,7 @@
 
     function drawFrame() {
       if (!episodeRef) return;
+      const t = Number.isFinite(explicitTime) ? explicitTime : syncReferenceTime();
       const buckets = PDC.episode.assignedBuckets(episodeRef);
       const rects = PDC.templates
         ? PDC.templates.resolveLayout(episodeRef, buckets.length)
@@ -161,12 +181,51 @@
         }
       });
 
+      // Timed visual moments — draw after videos so they overlay the composition.
+      const active = PDC.episode.activeMomentsAt ? PDC.episode.activeMomentsAt(episodeRef, t) : [];
+      if (active && active.length) {
+        active.forEach(function (m) {
+          if (!m || !m.text) return;
+          if (m.kind === "callout") {
+            // Bottom callout: bright background makes it measurable in screenshots/export.
+            ctx.save();
+            ctx.fillStyle = "rgba(250, 204, 21, 0.92)";
+            ctx.fillRect(60, h - 140, w - 120, 78);
+            ctx.fillStyle = "#0b1020";
+            ctx.font = "700 34px system-ui, sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(m.text.slice(0, 64), w / 2, h - 101);
+            // Deterministic marker pixel for automated verification.
+            ctx.fillStyle = "rgb(0, 214, 255)";
+            ctx.fillRect(w - 38, h - 38, 24, 24);
+            ctx.restore();
+          } else {
+            // Top title: darker banner + white type.
+            ctx.save();
+            ctx.fillStyle = "rgba(5, 7, 12, 0.86)";
+            ctx.fillRect(0, 0, w, 96);
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "800 44px system-ui, sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(m.text.slice(0, 52), w / 2, 48);
+            // Deterministic marker pixel for automated verification.
+            ctx.fillStyle = "rgb(210, 0, 255)";
+            ctx.fillRect(14, 14, 24, 24);
+            ctx.restore();
+          }
+        });
+      }
+
       canvasEl.dataset.preset = episodeRef.presetId;
       canvasEl.dataset.speakers = String(buckets.length);
+      canvasEl.dataset.time = String(Math.round(t * 1000) / 1000);
     }
 
     function loop() {
       syncReferenceTime();
+      explicitTime = null;
       drawFrame();
       rafId = requestAnimationFrame(loop);
     }
@@ -199,6 +258,7 @@
 
     function play() {
       playing = true;
+      explicitTime = null;
       const targetTime = alignPlayback(0);
       Object.keys(videos).forEach(function (b) {
         const p = videos[b].play();
@@ -220,6 +280,7 @@
 
     function restart() {
       referenceTime = 0;
+      explicitTime = 0;
       Object.keys(videos).forEach(function (b) {
         try {
           videos[b].currentTime = 0;
@@ -228,6 +289,15 @@
         }
       });
       play();
+    }
+
+    function setTime(seconds) {
+      const s = Number(seconds);
+      if (!Number.isFinite(s)) return;
+      explicitTime = Math.max(0, s);
+      seekAll(explicitTime);
+      referenceTime = explicitTime;
+      drawFrame();
     }
 
     function setMuted(muted) {
@@ -243,6 +313,13 @@
       play,
       pause,
       restart,
+      setTime,
+      getCurrentTime: function () {
+        return referenceTime;
+      },
+      getDuration: function () {
+        return previewDurationSeconds();
+      },
       setMuted,
       isPlaying: function () {
         return playing;

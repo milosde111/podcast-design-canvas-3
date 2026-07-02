@@ -153,3 +153,27 @@ test("audio quality survives preset switches and media updates", () => {
     noiseReduction: "strong",
   });
 });
+
+test("timed moments are stored, editable, removable, and independent of presets", () => {
+  const ep = E.createEpisode({});
+  const id1 = E.addMoment(ep, { kind: "title", text: "Hello", start: 0, end: 3 });
+  const id2 = E.addMoment(ep, { kind: "callout", text: "Ref", start: 4, end: 7 });
+  assert.equal(typeof id1, "string");
+  assert.equal(typeof id2, "string");
+  assert.equal(E.listMoments(ep).length, 2);
+
+  assert.equal(E.activeMomentsAt(ep, 1).length, 1);
+  assert.equal(E.activeMomentsAt(ep, 1)[0].kind, "title");
+  assert.equal(E.activeMomentsAt(ep, 5)[0].kind, "callout");
+  assert.equal(E.activeMomentsAt(ep, 8).length, 0);
+
+  E.updateMoment(ep, id2, { text: "Updated", start: 2, end: 2.5 });
+  const at22 = E.activeMomentsAt(ep, 2.2);
+  assert.equal(at22.find((m) => m.id === id2).text, "Updated");
+
+  E.setPreset(ep, "spotlight");
+  assert.equal(E.listMoments(ep).length, 2, "moments survive preset switches");
+
+  E.removeMoment(ep, id1);
+  assert.equal(E.listMoments(ep).length, 1);
+});

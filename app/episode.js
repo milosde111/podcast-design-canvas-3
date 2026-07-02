@@ -22,6 +22,9 @@
         clarity: "balanced",
         noiseReduction: "balanced",
       },
+      // Timed visual moments: lightweight contextual editing slice.
+      // Each moment: { id, kind: "title"|"callout", text, start, end }
+      moments: [],
     };
   }
 
@@ -83,6 +86,72 @@
   function getAudioQuality(episode) {
     const q = ensureAudioQuality(episode);
     return { leveling: q.leveling, clarity: q.clarity, noiseReduction: q.noiseReduction };
+  }
+
+  function ensureMoments(episode) {
+    if (!episode.moments || !Array.isArray(episode.moments)) episode.moments = [];
+    return episode.moments;
+  }
+
+  function clampNumber(v, fallback) {
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  function normalizeMoment(raw) {
+    const kind = raw && raw.kind === "callout" ? "callout" : "title";
+    const text = String((raw && raw.text) || "").trim();
+    let start = clampNumber(raw && raw.start, 0);
+    let end = clampNumber(raw && raw.end, start + 1);
+    start = Math.max(0, start);
+    end = Math.max(start, end);
+    return { kind, text, start, end };
+  }
+
+  function nextMomentId(episode) {
+    episode._nextMomentId = clampNumber(episode._nextMomentId, 1);
+    const id = "m" + episode._nextMomentId;
+    episode._nextMomentId += 1;
+    return id;
+  }
+
+  function addMoment(episode, raw) {
+    const moments = ensureMoments(episode);
+    const m = normalizeMoment(raw || {});
+    const id = (raw && raw.id) || nextMomentId(episode);
+    moments.push({ id, kind: m.kind, text: m.text, start: m.start, end: m.end });
+    return id;
+  }
+
+  function updateMoment(episode, id, patch) {
+    const moments = ensureMoments(episode);
+    const idx = moments.findIndex((m) => m.id === id);
+    if (idx === -1) return false;
+    const current = moments[idx];
+    const merged = normalizeMoment({
+      kind: patch && patch.kind != null ? patch.kind : current.kind,
+      text: patch && patch.text != null ? patch.text : current.text,
+      start: patch && patch.start != null ? patch.start : current.start,
+      end: patch && patch.end !=null ? patch.end : current.end,
+    });
+    moments[idx] = { id: current.id, kind: merged.kind, text: merged.text, start: merged.start, end: merged.end };
+    return true;
+  }
+
+  function removeMoment(episode, id) {
+    const moments = ensureMoments(episode);
+    const before = moments.length;
+    episode.moments = moments.filter((m) => m.id !== id);
+    return episode.moments.length !== before;
+  }
+
+  function listMoments(episode) {
+    return ensureMoments(episode).slice().sort((a, b) => (a.start - b.start) || String(a.id).localeCompare(String(b.id)));
+  }
+
+  function activeMomentsAt(episode, timeSeconds) {
+    const t = clampNumber(timeSeconds, 0);
+    return listMoments(episode).filter((m) => t >= m.start && t < m.end);
   }
 
   // Pull a readable handle out of a social/profile URL (last path segment, or a
@@ -153,6 +222,11 @@
     getSocialLink,
     setAudioQuality,
     getAudioQuality,
+    addMoment,
+    updateMoment,
+    removeMoment,
+    listMoments,
+    activeMomentsAt,
     deriveHandle,
     speakerName,
     canCompose,

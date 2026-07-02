@@ -2,7 +2,7 @@
 (function () {
   const PDC = window.PDC;
   const { PRESETS, BUCKET_LABELS, SPEAKER_BUCKETS } = PDC.presets;
-  const { createEpisode, assignMedia, clearMedia, assignedBuckets, setPreset, setSocialLink, speakerName, canCompose, readinessReason, setAudioQuality, getAudioQuality } = PDC.episode;
+  const { createEpisode, assignMedia, clearMedia, assignedBuckets, setPreset, setSocialLink, speakerName, canCompose, readinessReason, setAudioQuality, getAudioQuality, addMoment, updateMoment, removeMoment, listMoments } = PDC.episode;
 
   const $ = function (id) {
     return document.getElementById(id);
@@ -10,6 +10,8 @@
 
   const episode = createEpisode({ title: "Episode 1" });
   const preview = PDC.preview.createPreview($("stage-canvas"));
+  // Expose the live app state for rendered verification scripts.
+  PDC.app = { episode, preview };
 
   const VIDEO_EXT = /\.(mp4|webm|mov|m4v|ogg|ogv|avi|mkv)$/i;
 
@@ -278,6 +280,127 @@
     }
   });
 
+  function fmtTime(s) {
+    const n = Number(s);
+    const v = Number.isFinite(n) ? Math.max(0, n) : 0;
+    const m = Math.floor(v / 60);
+    const sec = Math.floor(v % 60);
+    return m + ":" + String(sec).padStart(2, "0");
+  }
+
+  const timeline = $("timeline");
+  const timelineReadout = $("timeline-readout");
+  if (timeline) {
+    timeline.addEventListener("input", function () {
+      const t = Number(timeline.value);
+      preview.setTime(t);
+      if (timelineReadout) timelineReadout.textContent = fmtTime(t);
+    });
+  }
+
+  const momentList = $("moment-list");
+  const momentKind = $("moment-kind");
+  const momentText = $("moment-text");
+  const momentStart = $("moment-start");
+  const momentEnd = $("moment-end");
+  const momentSave = $("moment-save");
+  const momentCancel = $("moment-cancel");
+  let editingMomentId = null;
+
+  function readMomentForm() {
+    return {
+      kind: (momentKind && momentKind.value) || "title",
+      text: (momentText && momentText.value) || "",
+      start: momentStart ? Number(momentStart.value) : 0,
+      end: momentEnd ? Number(momentEnd.value) : 0,
+    };
+  }
+
+  function resetMomentForm() {
+    editingMomentId = null;
+    if (momentKind) momentKind.value = "title";
+    if (momentText) momentText.value = "";
+    if (momentStart) momentStart.value = "0";
+    if (momentEnd) momentEnd.value = "3";
+    if (momentSave) momentSave.textContent = "Add moment";
+    if (momentCancel) momentCancel.hidden = true;
+  }
+
+  function renderMoments() {
+    if (!momentList) return;
+    const moments = listMoments ? listMoments(episode) : (episode.moments || []);
+    momentList.innerHTML = "";
+    if (!moments.length) {
+      const empty = document.createElement("div");
+      empty.className = "hint";
+      empty.textContent = "No moments yet — add a title from 0:00-0:03 and a callout from 0:04-0:07.";
+      momentList.appendChild(empty);
+      return;
+    }
+    moments.forEach(function (m) {
+      const row = document.createElement("div");
+      row.className = "moment-row";
+      row.dataset.momentId = m.id;
+
+      const kind = document.createElement("span");
+      kind.className = "moment-kind " + (m.kind === "callout" ? "callout" : "title");
+      kind.textContent = m.kind === "callout" ? "Callout" : "Title";
+
+      const text = document.createElement("div");
+      text.className = "moment-text-preview";
+      text.textContent = m.text || "(empty)";
+
+      const time = document.createElement("div");
+      time.className = "moment-time";
+      time.textContent = fmtTime(m.start) + "–" + fmtTime(m.end);
+
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "moment-action";
+      edit.textContent = "Edit";
+      edit.addEventListener("click", function () {
+        editingMomentId = m.id;
+        if (momentKind) momentKind.value = m.kind;
+        if (momentText) momentText.value = m.text;
+        if (momentStart) momentStart.value = String(m.start);
+        if (momentEnd) momentEnd.value = String(m.end);
+        if (momentSave) momentSave.textContent = "Save";
+        if (momentCancel) momentCancel.hidden = false;
+      });
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "moment-action";
+      del.textContent = "Remove";
+      del.addEventListener("click", function () {
+        removeMoment(episode, m.id);
+        preview.render(episode);
+        renderMoments();
+      });
+
+      row.appendChild(kind);
+      row.appendChild(text);
+      row.appendChild(time);
+      row.appendChild(edit);
+      row.appendChild(del);
+      momentList.appendChild(row);
+    });
+  }
+
+  if (momentSave) {
+    momentSave.addEventListener("click", function () {
+      const data = readMomentForm();
+      if (editingMomentId) updateMoment(episode, editingMomentId, data);
+      else addMoment(episode, data);
+      preview.render(episode);
+      renderMoments();
+      resetMomentForm();
+    });
+  }
+  if (momentCancel) {
+    momentCancel.addEventListener("click", resetMomentForm);
+  }
+
   function refresh() {
     const ready = canCompose(episode);
     const n = assignedBuckets(episode).length;
@@ -292,13 +415,23 @@
     playBtn.textContent = preview.isPlaying() ? "⏸ Pause" : "▶ Play preview";
     $("restart").disabled = !ready;
     $("mute").disabled = !ready;
+    if (timeline) {
+      timeline.disabled = !ready;
+      const d = preview.getDuration ? preview.getDuration() : 0;
+      timeline.max = String(Math.max(1, d || 10));
+      const t = preview.getCurrentTime ? preview.getCurrentTime() : 0;
+      timeline.value = String(Math.min(Number(timeline.max), Math.max(0, t || 0)));
+      if (timelineReadout) timelineReadout.textContent = fmtTime(t);
+    }
     const exportBtn = $("export");
     if (exportBtn && exportBtn.textContent.indexOf("Exporting") === -1) exportBtn.disabled = !ready;
     if (!editor.isOpen()) $("customize").disabled = !ready;
+    if (momentSave) momentSave.disabled = !ready;
   }
 
   SPEAKER_BUCKETS.forEach(updateBucketRow);
   syncAudioUi();
   renderTemplates();
+  renderMoments();
   refresh();
 })();

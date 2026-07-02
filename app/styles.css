@@ -217,6 +217,90 @@ body {
 .transport .primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border: none; color: #fff; }
 .scope-note { margin-top: 14px; color: var(--muted); font-size: 12px; }
 
+/* Timeline / scrub -------------------------------------------------------- */
+.timeline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.timeline input[type="range"] { flex: 1; }
+.timeline-readout { color: var(--muted); font-size: 13px; min-width: 56px; text-align: right; }
+
+/* Timed moments ----------------------------------------------------------- */
+.moments { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.substep-title { margin: 0 0 8px; font-size: 14px; }
+.moment-form {
+  display: grid;
+  grid-template-columns: 140px 1fr 120px 120px auto auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 10px;
+}
+@media (max-width: 900px) {
+  .moment-form { grid-template-columns: 1fr 1fr; }
+}
+.moment-form label { display: flex; flex-direction: column; gap: 6px; }
+.moment-form label span { color: var(--muted); font-size: 12px; font-weight: 600; }
+.moment-form input, .moment-form select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #10131d;
+  color: var(--ink);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.moment-form button {
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.moment-form button:disabled { opacity: 0.45; cursor: not-allowed; }
+.moment-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.moment-row {
+  display: grid;
+  grid-template-columns: 86px 1fr 150px auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+@media (max-width: 700px) { .moment-row { grid-template-columns: 1fr; } }
+.moment-kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.moment-kind.title { background: rgba(210,0,255,0.12); border-color: rgba(210,0,255,0.35); }
+.moment-kind.callout { background: rgba(0,214,255,0.12); border-color: rgba(0,214,255,0.35); }
+.moment-text-preview { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.moment-time { color: var(--muted); font-size: 12px; }
+.moment-action {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #10131d;
+  color: var(--ink);
+  padding: 7px 9px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+.moment-action:hover { border-color: var(--muted); }
+
 /* Saved custom layouts (selectable like presets) */
 .templates { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
 .templates:empty { display: none; }
